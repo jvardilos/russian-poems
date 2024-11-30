@@ -12,16 +12,21 @@ make_translation_map <- function(translation) {
   return(setNames(translation$en, translation$ru))
 }
 
+fun <- function(tokens, tm) {
+  tokens[tokens %in% names(tm)] <- tm[tokens[tokens %in% names(tm)]]
+  return(tokens)
+}
+
 translate <- function(text, translation) {
   tm <- make_translation_map(translation)
 
-  lapply(tolower(text[1]), function(text) {
+  lapply(tolower(text), function(text) {
     tokens <- unlist(str_split(text, "\\s+"))
     tokens <- tokens[grepl("^\\b\\w+\\b$", tokens)]
-    print(tokens)
-    return(str_replace_all(tokens, tm))
+    return(fun(tokens, tm))
   })
 }
 
+
 poems$translation <- translate(poems$text, translation)
-poems$translation[1]
+poems$translation[1:23]
