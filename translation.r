@@ -6,9 +6,7 @@ library(dplyr)
 
 translation <- read_csv("translation.csv")
 all_poems <- read_csv("poems.csv")
-poems <- all_poems[1:3000, ]
-
-str(all_poems)
+poems <- all_poems
 
 get_tokens <- function(text) {
   tokens <- unlist(str_split(text, "\\s+"))
@@ -21,17 +19,25 @@ translate <- function(text, translation) {
 
   result <- lapply(tolower(text), function(text) {
     tokens <- get_tokens(text)
+    tokens_copy <- tokens
     translated_tokens <- tm[tokens[tokens %in% names(tm)]]
     rate <- length(translated_tokens) / length(tokens)
 
     tokens[tokens %in% names(tm)] <- translated_tokens
     translated <- paste(tokens, collapse = " ")
-    # print(as.list(tokens))
-    return(list(translated = translated, rate = rate))
+
+    # Return tokens and translated tokens
+    return(list(translated = translated, rate = rate, tokens = tokens_copy, translated_tokens = translated_tokens))
   })
 
-  result_df <- do.call(rbind, lapply(result, as.data.frame))
-  # print(result_df)
+  # Convert to data frame with tokens
+  result_df <- do.call(rbind, lapply(result, function(x) {
+    data.frame(translated = x$translated,
+               rate = x$rate,
+               tokens = I(list(x$tokens)),
+               translated_tokens = I(list(x$translated_tokens)))
+  }))
+
   return(result_df)
 }
 
@@ -52,12 +58,10 @@ average_words_per_line <- function(text) {
 
 translation <- translate(poems$text, translation)
 
-translation$tokens
-translation$translated
 poems$translation <- translation$translated
 poems$translation_rate <- as.numeric(translation$rate)
-# poems$tokens <- translation$tokens
-# poems$translated_tokens <- translation$translated_tokens
+poems$tokens <- translation$tokens
+poems$translated_tokens <- translation$translated_tokens
 poems$lines_rate <- sapply(poems$text, average_words_per_line)
 
 
@@ -69,8 +73,14 @@ aggregate_authors <- function(poems) {
     summarise(
       translation_rate = mean(translation_rate),
       lines_rate = mean(lines_rate),
-      # favorite_word = mode(tokens),
-      # favorite_translated_word = mode(translated_tokens),
+      favorite_word = {
+        freq_table <- sort(table(unlist(tokens)), decreasing = TRUE)
+        names(freq_table[1])
+      },
+      favorite_translated_word = {
+        freq_table <- sort(table(unlist(translated_tokens)), decreasing = TRUE)
+        names(freq_table[1])
+      },
     )
   # remove NaNs from the aggregation
   ag$translation_rate[is.nan(ag$translation_rate)] <- 0
@@ -84,8 +94,8 @@ ag <- aggregate_authors(poems)
 highest_translation_rate <- ag[order(ag$translation_rate, decreasing = TRUE), ]
 highest_lines_rate <- ag[order(ag$lines_rate, decreasing = TRUE), ]
 lowest_lines_rate <- ag[order(ag$lines_rate, decreasing = FALSE), ]
-
-# plot(highest_lines_rate$translation_rate)
+favorite_word <- ag[order(ag$favorite_word, decreasing = TRUE), ]
+favorite_translated_word <- ag[order(ag$favorite_translated_word, decreasing = TRUE), ]
 
 ### favorite word by author
 ### authors most used translated word - mode
