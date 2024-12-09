@@ -75,6 +75,9 @@ poems$translated_tokens <- translation$translated_tokens
 poems$lines_rate <- sapply(poems$text, average_words_per_line)
 
 
+tco <- c("translation", "text")
+write.csv(poems[tco], file = "poems-translated.csv", row.names = FALSE)
+
 ### end cleaning
 
 index <- 2
