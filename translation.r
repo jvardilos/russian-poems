@@ -1,5 +1,8 @@
 setwd("~/russian-poems")
 
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2)
 library(readr)
 library(stringr)
 library(dplyr)
@@ -27,15 +30,22 @@ translate <- function(text, translation) {
     translated <- paste(tokens, collapse = " ")
 
     # Return tokens and translated tokens
-    return(list(translated = translated, rate = rate, tokens = tokens_copy, translated_tokens = translated_tokens))
+    return(list(
+      translated = translated,
+      rate = rate,
+      tokens = tokens_copy,
+      translated_tokens = translated_tokens
+    ))
   })
 
   # Convert to data frame with tokens
   result_df <- do.call(rbind, lapply(result, function(x) {
-    data.frame(translated = x$translated,
-               rate = x$rate,
-               tokens = I(list(x$tokens)),
-               translated_tokens = I(list(x$translated_tokens)))
+    data.frame(
+      translated = x$translated,
+      rate = x$rate,
+      tokens = I(list(x$tokens)),
+      translated_tokens = I(list(x$translated_tokens))
+    )
   }))
 
   return(result_df)
@@ -67,19 +77,20 @@ poems$lines_rate <- sapply(poems$text, average_words_per_line)
 
 ### end cleaning
 
+index <- 2
 aggregate_authors <- function(poems) {
   ag <- poems %>%
     group_by(writer) %>%
     summarise(
       translation_rate = mean(translation_rate),
       lines_rate = mean(lines_rate),
-      favorite_word = {
+      favorite_words = {
         freq_table <- sort(table(unlist(tokens)), decreasing = TRUE)
-        names(freq_table[1])
+        list(names(freq_table[1:100]))
       },
-      favorite_translated_word = {
+      favorite_translated_words = {
         freq_table <- sort(table(unlist(translated_tokens)), decreasing = TRUE)
-        names(freq_table[1])
+        list(names(freq_table[1:100]))
       },
     )
   # remove NaNs from the aggregation
@@ -90,15 +101,28 @@ aggregate_authors <- function(poems) {
 
 ag <- aggregate_authors(poems)
 
+# Sort aggregated authors to find what I need
+htr <- ag[order(ag$translation_rate, decreasing = TRUE), ]
+largest_lines <- ag[order(ag$lines_rate, decreasing = TRUE), ]
+smallest_lines <- ag[order(ag$lines_rate, decreasing = FALSE), ]
 
-highest_translation_rate <- ag[order(ag$translation_rate, decreasing = TRUE), ]
-highest_lines_rate <- ag[order(ag$lines_rate, decreasing = TRUE), ]
-lowest_lines_rate <- ag[order(ag$lines_rate, decreasing = FALSE), ]
-favorite_word <- ag[order(ag$favorite_word, decreasing = TRUE), ]
-favorite_translated_word <- ag[order(ag$favorite_translated_word, decreasing = TRUE), ]
+# Get Top 5 Poets who are the most translatable
+htr$writer[1:5]
+htr$translation_rate[1:5]
 
-### favorite word by author
-### authors most used translated word - mode
-### shortest Lines by author
+# get min and max line rate of each author
+largest_lines$lines_rate[1:5]
+largest_lines$writer[1:5]
 
-write.csv(highest_translation_rate, file = "translation_effort.csv", row.names = FALSE)
+smallest_lines$lines_rate[1:5]
+smallest_lines$writer[1:5]
+
+# Generate the wordclouds of Russian and translated
+
+words <- unlist(htr$favorite_words)
+translated_words <- unlist(htr$favorite_translated_words)
+distribution_words <- sort(table(words), decreasing = TRUE)
+distribution_words_translated <- sort(table(translated_words), decreasing = TRUE)
+
+wordcloud2(data = distribution_words, size = 1.6, color = 'random-dark')
+wordcloud2(data = distribution_words_translated, size = 1.6, color = "random-dark")
